@@ -3,6 +3,37 @@ import { buildFileTreeV2Model, flattenFileTreeV2, flattenLiveFileTreeV2 } from "
 import type { FileNode } from "@opencode-ai/sdk/v2"
 
 describe("buildFileTreeV2Model", () => {
+  test.each([
+    { name: "empty", paths: [] },
+    { name: "separator-only", paths: ["", "/", "///", "\\"] },
+  ])("ignores $name paths", (input) => {
+    expect(buildFileTreeV2Model(input.paths)).toEqual({ children: new Map(), total: 0 })
+  })
+
+  test.each([
+    { paths: ["a", "a/b.ts"], type: "file" },
+    { paths: ["a/b.ts", "a"], type: "directory" },
+  ])("preserves the first node type when paths collide: $type", (input) => {
+    const model = buildFileTreeV2Model(input.paths)
+
+    expect(model.total).toBe(2)
+    expect(model.children.get("")).toEqual([
+      { name: "a", path: "a", absolute: "a", type: input.type, ignored: false, originalPath: "a" },
+    ])
+    expect(model.children.get("a")).toEqual([
+      { name: "b.ts", path: "a/b.ts", absolute: "a/b.ts", type: "file", ignored: false, originalPath: "a/b.ts" },
+    ])
+  })
+
+  test("does not mutate input paths", () => {
+    const paths = Object.freeze(["src\\a.ts", "", "src/a.ts", "README.md"])
+    const model = buildFileTreeV2Model(paths)
+
+    expect(model.total).toBe(3)
+    expect(paths).toEqual(["src\\a.ts", "", "src/a.ts", "README.md"])
+    expect(model.children.get("src")?.[0]?.originalPath).toBe("src\\a.ts")
+  })
+
   test("builds a sorted tree and flattens expanded directories", () => {
     const model = buildFileTreeV2Model(["src/z.ts", "src/lib/b.ts", "src/lib/a.ts", "README.md", "docs/guide.md"])
 

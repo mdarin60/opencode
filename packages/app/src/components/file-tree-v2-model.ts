@@ -20,6 +20,27 @@ export function normalizeFileTreeV2Path(value: string) {
 }
 
 export function buildFileTreeV2Model(paths: readonly string[]): FileTreeV2Model {
+  const nodes = collectFileTreeNodes(paths)
+
+  const children = new Map<string, FileTreeV2Node[]>()
+  nodes.forEach((node) => {
+    const index = node.path.lastIndexOf("/")
+    const parent = index === -1 ? "" : node.path.slice(0, index)
+    const list = children.get(parent)
+    if (list) list.push(node)
+    else children.set(parent, [node])
+  })
+  children.forEach((nodes) =>
+    nodes.sort((a, b) => {
+      if (a.type !== b.type) return a.type === "directory" ? -1 : 1
+      return a.name.localeCompare(b.name)
+    }),
+  )
+
+  return { children, total: nodes.size }
+}
+
+function collectFileTreeNodes(paths: readonly string[]): Map<string, FileTreeV2Node> {
   const nodes = new Map<string, FileTreeV2Node>()
 
   paths.forEach((value) => {
@@ -41,22 +62,7 @@ export function buildFileTreeV2Model(paths: readonly string[]): FileTreeV2Model 
     })
   })
 
-  const children = new Map<string, FileTreeV2Node[]>()
-  nodes.forEach((node) => {
-    const index = node.path.lastIndexOf("/")
-    const parent = index === -1 ? "" : node.path.slice(0, index)
-    const list = children.get(parent)
-    if (list) list.push(node)
-    else children.set(parent, [node])
-  })
-  children.forEach((nodes) =>
-    nodes.sort((a, b) => {
-      if (a.type !== b.type) return a.type === "directory" ? -1 : 1
-      return a.name.localeCompare(b.name)
-    }),
-  )
-
-  return { children, total: nodes.size }
+  return nodes
 }
 
 export function flattenFileTreeV2(model: FileTreeV2Model, expanded: (path: string) => boolean) {
